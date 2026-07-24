@@ -1,271 +1,32 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="generator" content="Three.js Editor">
-<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-<link rel="stylesheet" href="estilos.css">
-<title>Visor Three.js</title>
+  <meta charset="UTF-8">
+  <meta name="generator" content="Three.js Editor">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <link rel="stylesheet" href="estilos.css">
+  <title>Visor Three.js</title>
 
-<script type="importmap">
-{
-  "imports": {
-    "three":"https://unpkg.com/three@0.179.1/build/three.module.js",
-    "three/addons/":"https://unpkg.com/three@0.179.1/examples/jsm/"
+  <!-- Mapa de importaciones para Three.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.179.1/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.179.1/examples/jsm/"
+    }
   }
-}
-</script>
-
+  </script>
 </head>
 
 <body>
- <details open>
+  <details open>
     <summary>Menú</summary>
-
     <div>
-        <p>Decime una acción:</p>
-
-        <input  type="search" id="idTextoUsuario" placeholder="avanza 5 pasos...">
-
-        <button onclick="fnActuar()">
-            Actuar
-        </button>
+      <p>Decime una acción:</p>
+      <input type="search" id="idTextoUsuario" placeholder="avanza 5 pasos...">
+      <button onclick="fnActuar()">Actuar</button>
     </div>
-</details>
-
-<script type="module">
-
-import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-
-const sceneLoader = new THREE.ObjectLoader();
-
-const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setSize(window.innerWidth,window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-document.body.appendChild(renderer.domElement);
-
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.set(0,8,18);
-
-const controls = new OrbitControls(camera,renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.enableZoom = true;
-controls.enableRotate = true;
-controls.enablePan = true;
-
-let escena;
-let personaje;
-let cubos = [];
-window.cubos = cubos ;
-let cuboAgarrado = null; // Variable nueva para saber si llevamos algo
-window.cuboAgarrado = cuboAgarrado ;
-
-const idTextoUsuario = document.getElementById("idTextoUsuario");
-
-sceneLoader.load(
-    "Scene.json",
-    function(scene){
-         escena = scene;
-         personaje = escena.getObjectByName("robot");
-         
-         // Llenar el array de cubos
-         scene.traverse(function(hijo) {
-             if (hijo.isMesh && hijo.material && hijo.material.name) {
-                 if (hijo.material.name.includes("cubo")) {
-                     cubos.push(hijo);
-                 }
-             }
-         });
-         
-        const box = new THREE.Box3().setFromObject(scene);
-        const center = box.getCenter(new THREE.Vector3());
-        controls.target.copy(center);
-        controls.update();
-        animate(scene);
-    },
-    undefined,
-    function(error){ console.error(error); }
-);
-
-function animate(scene){
-    requestAnimationFrame(()=>animate(scene));
-    controls.update();
-    renderer.render(scene,camera);
-}
-
-window.addEventListener("resize",()=>{
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth,window.innerHeight);
-});
-
-function fnActuar() {
-    fnProcesarTexto( idTextoUsuario.value ) ;
-    idTextoUsuario.focus() ;
-    idTextoUsuario.select() ;
-    return ;
-}
-window.fnActuar = fnActuar;
-
-idTextoUsuario.onkeyup = function(event){
-    if(event.code === "Enter"){
-        fnActuar();
-    }
-};
-
-function fnProcesarTexto(_dadoTexto){
-
-    _dadoTexto = _dadoTexto.toLowerCase(); 
-
-    // AVANZAR
-    let _expRegAvanzar = /(move|avan|camina)(.*?)\s(?<_num>\d+)\s(paso|lugar)/i;//objeto de tipo RegExp
-    let _extracc1 = _expRegAvanzar.exec(_dadoTexto);
-    if(_extracc1){
-        let _cantPasos = Number(_extracc1.groups._num);
-        animarAdelante(personaje,_cantPasos);
-        return;
-    }
-
-    // GIRAR DERECHA
-    let _expRegDerecha = /(gir|move|rot)(.*?)\s(der)/i;
-    if(_expRegDerecha.test(_dadoTexto)){
-        girarDerecha(personaje);
-        return;
-    }
-
-    // GIRAR IZQUIERDA
-    let _expRegIzquierda = /(gir|move|rot)(.*?)\s(izq)/i;
-    if(_expRegIzquierda.test(_dadoTexto)){
-        girarIzquierda(personaje);
-        return;
-    }
-
-    // AGARRAR CUBO
-    let _expRegAgarrar = /(agarrar|tomar|levanta|agarra)/i;
-    if(_expRegAgarrar.test(_dadoTexto)){
-        fnAgarrarCubo();
-        return;
-    }
-
-    // SOLTAR CUBO
-    let _expRegSoltar = /(solta|deja|tira|suelta)/i;
-    if(_expRegSoltar.test(_dadoTexto)){
-        fnSoltarCubo();
-        return;
-    }
-
-    alert("No te entendí. Probá de nuevo.");
-}
-
-function animarAdelante(personaje, pasos){
-    if(!personaje) return;
-
-    let totalMiniPasos = pasos * 10;
-    let distanciaMiniPaso = 0.1;
-
-    for(let i = 0; i < totalMiniPasos; i++) {
-        personaje.translateZ(distanciaMiniPaso);
-    }
-}
-
-window.animarAdelante = animarAdelante ;
-function girarDerecha(personaje){
-    if(!personaje) return;
-    personaje.rotation.y -= THREE.MathUtils.degToRad(45);
-}
-
-function girarIzquierda(personaje){
-    if(!personaje) return;
-    personaje.rotation.y += THREE.MathUtils.degToRad(45);
-}
-
-// LÓGICA DE AGARRAR Y SOLTAR
-
-function fnAgarrarCubo() {
-    if(cuboAgarrado) {
-        alert("Ya tengo un cubo en la mano.");
-        return;
-    }
-
-    let cajaRobot = new THREE.Box3().setFromObject(personaje);
-    cajaRobot.expandByScalar(1.5); // Agrandamos el área de agarre un poco para que no sea tan difícil
-
-    for(let i = 0; i < cubos.length; i++) {
-        let cajaCubo = new THREE.Box3().setFromObject(cubos[i]);
-        
-        if(cajaRobot.intersectsBox(cajaCubo)) {
-            cuboAgarrado = cubos[i];
-            
-            // Lo atamos al personaje para que se mueva con él
-            personaje.add(cuboAgarrado);
-            // Lo acomodamos un poco arriba y adelante
-            cuboAgarrado.position.set(0, 0.5, 0.8); 
-            
-            console.log("Cubo agarrado!");
-            return;
-        }
-    }
-    alert("No hay ningún cubo lo suficientemente cerca.");
-}
-
-function fnSoltarCubo() {
-    if(!cuboAgarrado) {
-        alert("No tengo nada para soltar.");
-        return;
-    }
-
-    // Guardamos la posición del cubo antes de separarlo del robot
-    let posMundo = new THREE.Vector3();
-    cuboAgarrado.getWorldPosition(posMundo);
-    
-    // Lo sacamos de la jerarquía del robot y lo volvemos parte de la escena
-    escena.add(cuboAgarrado);
-    cuboAgarrado.position.copy(posMundo);
-
-    // Ajustamos la altura para que quede apoyado sobre el piso
-    cuboAgarrado.position.y = 0.5;
-    
-    // Reiniciamos la rotación del cubo
-    cuboAgarrado.rotation.set(0,0,0);
-    
-    cuboAgarrado = null;
-    console.log("Cubo en el piso.");
-
-    // Cada vez que soltamos, comprobamos si se completó el objetivo
-    fnChequearVictoria();
-}
-
-function fnChequearVictoria() {
-    // Usamos el aro (Torus) como zona de destino
-    let zonaDestino = escena.getObjectByName("Torus"); 
-    if(!zonaDestino) return;
-
-    let posDestino = new THREE.Vector3();
-    zonaDestino.getWorldPosition(posDestino);
-
-    let cubosEnDestino = 0;
-
-    for(let cubo of cubos) {
-        let posCubo = new THREE.Vector3();
-        cubo.getWorldPosition(posCubo);
-        
-        // Si el cubo está a menos de 5 unidades de distancia del aro
-        if(posCubo.distanceTo(posDestino) < 5) { 
-            cubosEnDestino++;
-        }
-    }
-
-    if(cubosEnDestino >= 3) {
-        // Un pequeño delay para que se termine de dibujar el cubo cayendo
-        setTimeout(() => {
-            alert("¡GANASTE! Llevaste los 3 cubos a la zona de destino.");
-        }, 300);
-    }
-}
-
-</script>
+  </details>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
